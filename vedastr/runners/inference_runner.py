@@ -9,6 +9,7 @@ from ..converter import build_converter
 from ..models import build_model
 from ..utils import load_checkpoint
 
+import cv2 
 
 class InferenceRunner(Common):
 
@@ -23,7 +24,7 @@ class InferenceRunner(Common):
         self.converter = self._build_converter(inference_cfg['converter'])
         # build model
         self.model = self._build_model(inference_cfg['model'])
-        self.logger.info(self.model)
+        #self.logger.info(self.model)
         self.postprocess_cfg = inference_cfg.get('postprocess', None)
         self.model.eval()
 
@@ -46,8 +47,8 @@ class InferenceRunner(Common):
                 )
                 self.logger.info('Using distributed training')
             else:
-                if torch.cuda.device_count() > 1:
-                    model = torch.nn.DataParallel(model)
+#                 if torch.cuda.device_count() > 1:
+#                     model = torch.nn.DataParallel(model)
                 model.cuda()
         return model
 
@@ -101,10 +102,11 @@ class InferenceRunner(Common):
             image, text = aug['image'], aug['label']
             image = image.unsqueeze(0)
             label_input, label_length, label_target = self.converter.test_encode([text])  # noqa 501
+            #cv2.imwrite("transformed_img.png", image.numpy()) #ak
             if self.use_gpu:
                 image = image.cuda()
                 label_input = label_input.cuda()
-
+            print("in runner: tensor size:", image.size()) #ak
             if self.need_text:
                 pred = self.model((image, label_input))
             else:

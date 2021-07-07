@@ -9,6 +9,7 @@ import cv2  # noqa 402
 from vedastr.runners import InferenceRunner  # noqa 402
 from vedastr.utils import Config  # noqa 402
 
+import numpy as np
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Inference')
@@ -35,13 +36,17 @@ def main():
         images = [args.image]
     else:
         images = [
-            os.path.join(args.image, name) for name in os.listdir(args.image)
+            os.path.join(args.image, name) for name in filter(lambda x: False if x[-18:]=='.ipynb_checkpoints' else True, os.listdir(args.image))
         ]
+        print(images)
     for img in images:
         image = cv2.imread(img)
+        print(np.shape(image))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite("save_img.png", image)
+        print("in inference.py image size", np.shape(image))
         pred_str, probs = runner(image)
-        runner.logger.info('Text in {} is:\t {} '.format(pred_str, img))
+        runner.logger.info('Text in {} is:\t {} '.format(img, pred_str))
 
 
 if __name__ == '__main__':

@@ -105,7 +105,12 @@ class Resize(albu.Resize):
                  p=1):
         super(Resize, self).__init__(size[0], size[1],
                                      CV2_INTER[interpolation], always_apply, p)
-
+    #added by ak (apply already exists in albu.resize!)
+#     def apply(self, img, interpolation=cv2.INTER_LINEAR, **params):
+#         result = super().apply(img, interpolation=cv2.INTER_LINEAR, **params) #F.resize(img, height=self.height, width=self.width, interpolation=interpolation)
+#         cv2.imwrite("Post_sizing.png",result)
+#         return result
+        
 
 @TRANSFORMS.register_module
 class PadIfNeeded(albu.PadIfNeeded):
@@ -216,6 +221,11 @@ class ToTensor(DualTransform):
         super(ToTensor, self).__init__(always_apply=True)
 
     def apply(self, image, **params):
+        #ak
+#         print("in totensor")
+#         print("image size",np.shape(image))
+#         cv2.imwrite("post_transformed_image.png", image)
+        
         if isinstance(image, np.ndarray):
             if image.ndim == 2:
                 image = image[:, :, None]
@@ -240,6 +250,13 @@ class Sensitive(DualTransform):
         super(Sensitive, self).__init__(always_apply=True)
 
     def __call__(self, force_apply=False, **kwargs):
+        #ak
+#         print("in sensitive")
+#         image = kwargs.get('image')
+#         print("image size",np.shape(image))
+#         cv2.imwrite("pre_transfomred_image.png", image)
+
+        
         label = kwargs.get('label')
         if not self.sensitive:
             label = label.lower()
@@ -284,7 +301,7 @@ class ToGray(albu.ToGray):
         new_img = self.apply(kwargs['image'])
         if self.channel == 1:
             kwargs['image'] = new_img[:, :, :1]
-
+        #cv2.imwrite("post_ToGray_image.png",new_img) #ak
         return kwargs
 
 

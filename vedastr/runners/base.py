@@ -93,6 +93,7 @@ class Common(object):
     def _build_dataloader(self, cfg):
         transform = build_transform(cfg['transform'])
         dataset = build_datasets(cfg['dataset'], dict(transform=transform))
+        self.dataset = dataset#added by akamboj so benchmark can use runner.dataset
 
         # TODO, distributed sampler or not
         if not cfg.get('sampler'):

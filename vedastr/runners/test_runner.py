@@ -23,10 +23,14 @@ class TestRunner(InferenceRunner):
     def test_batch(self, img, label, save_path=None, exclude_num=0):
         self.model.eval()
         with torch.no_grad():
+            
             label_input, label_length, label_target = self.converter.test_encode(label)  # noqa 501
+
             if self.use_gpu:
                 img = img.cuda()
                 label_input = label_input.cuda()
+                
+            print("sizes in test_batch:", np.shape(img),np.shape(label_input)) #ak
 
             if self.need_text:
                 pred = self.model((img, label_input))
@@ -53,18 +57,27 @@ class TestRunner(InferenceRunner):
         accs = []
         for name, dataloader in self.test_dataloader.items():
             test_exclude_num = self.test_exclude_num[name]
+            
+            
             save_path = None
+            #ak
+            #save_path = '/workdir/cstr-vedastr/images/'
+            
             self.backup_metric.reset()
             for tidx, (img, label) in enumerate(dataloader):
                 exclude_num = test_exclude_num if (tidx +
                                                    1) == len(dataloader) else 0
 
                 self.test_batch(img, label, save_path, exclude_num)
+                #break #ak
             accs.append(self.backup_metric.avg['acc']['true'])
             self.logger.info(
                 'Test, current dataset root %s, acc %.4f, edit distance %.4f' %
                 (name, self.backup_metric.avg['acc']['true'],
                  self.backup_metric.avg['edit']))
+            
+            #break #ak
+            
         self.logger.info(
             'Test, average acc %.4f, edit distance %s' %
             (self.metric.avg['acc']['true'], self.metric.avg['edit']))
