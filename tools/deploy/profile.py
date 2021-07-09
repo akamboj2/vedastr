@@ -17,9 +17,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
 
 import cv2  # noqa 402
-from volksdep.benchmark import benchmark  # noqa 402
+#from volksdep.benchmark import benchmark  # noqa 402
 
-from tools.deploy.utils import CALIBRATORS, CalibDataset, Metric, MetricDataset  # noqa 402
+#from tools.deploy.utils import CALIBRATORS, CalibDataset, Metric, MetricDataset  # noqa 402
 from vedastr.runners import TestRunner, InferenceRunner
 # noqa 402
 from vedastr.utils import Config  # noqa 402
@@ -30,6 +30,10 @@ import torch
 import time
 from torch2trt import torch2trt
 import torch.autograd.profiler as profiler
+
+#from jbdub
+import torch.nn as nn
+from torch2trt import *
 
 
 def parse_args():
@@ -77,10 +81,67 @@ def main():
     dummy_input = (dummy_samples,dummy_label)
     #print(np.shape(dummy_label))
     
+
+
+    #from jbdub
+    @tensorrt_converter('torch.softmax')
+    @tensorrt_converter('torch.Tensor.softmax')
+    @tensorrt_converter('torch.nn.functional.softmax')
+    def convert_softmax(ctx):
+        input = ctx.method_args[0]
+        input_trt = add_missing_trt_tensors(ctx.network, [input])[0]
+        output = ctx.method_return
+
+        # get dims from args or kwargs
+        if 'dim' in ctx.method_kwargs:
+            dim = ctx.method_kwargs['dim']
+        elif len(ctx.method_args) >= 2:
+            dim = ctx.method_args[1]
+
+        if dim < 0:
+            dim = len(input.shape) + dim
+
+        axes = 1 << (dim - 1)
+
+        layer = ctx.network.add_softmax(input=input_trt)
+        layer.axes = axes
+        
+        output._trt = layer.get_output(0)
+        
+    @tensorrt_converter('torch.matmul')
+    def convert_mul(ctx):
+        input_a = ctx.method_args[0]
+        input_b = ctx.method_args[1]
+        input_a_trt, input_b_trt = trt_(ctx.network, input_a, input_b)
+        output = ctx.method_return
+        layer = ctx.network.add_matrix_multiply(input_a_trt, trt.MatrixOperation.NONE, input_b_trt, trt.MatrixOperation.NONE)
+        output._trt = layer.get_output(0)
+        
+    @tensorrt_converter('torch.Tensor.expand_as')
+    @tensorrt_converter('torch.Tensor.expand')
+    def convert_expand(ctx):
+        input = ctx.method_args[0]
+        sizes = ctx.method_args[1:]
+        output = ctx.method_return
+
+        inshape = tuple(input.shape)[1:] # exclude batch
+        shape = tuple(output.shape)[1:]
+        ndim = len(shape)
+        start = tuple([0]*ndim)
+        stride = tuple([int(i == o) for i, o in zip(inshape, shape)])  # stride == 1 if dimensions match, 0 otherwise
+
+        layer = ctx.network.add_slice(input._trt, start, shape, stride)
+
+        output._trt = layer.get_output(0)
+    
+
     if need_text:
         model = torch2trt(model, [dummy_input])
     else:
-        model = torch2trt(model, [dummy_samples])#,use_onnx=True)
+        model = torch2trt(model, [dummy_samples], max_batch_size=256)#,use_onnx=True)
+        dummy_input = dummy_samples
+        
+    torch.save(model.state_dict(),'cstr_trt.pth')
     
     #note: taken from  volksdep benchmark.py
     with torch.no_grad():
